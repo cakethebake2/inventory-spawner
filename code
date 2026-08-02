@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- // Create GUI (unchanged)
+-- // Create GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "InventorySpawner"
 screenGui.ResetOnSpawn = false
@@ -109,7 +109,7 @@ uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 uiListLayout.Parent = itemList
 
--- // --- HIGH VALUE KNIVES (MM2 specific) ---
+-- // --- HIGH VALUE KNIVES (MM2) ---
 local highValueItems = {
     "Gingerscope", "Ancient", "Godly", "Chroma", "Luger", "Clockwork",
     "Elderwood", "Hallowscythe", "Battleaxe", "Icebreaker", "Virtual",
@@ -130,24 +130,24 @@ local highValueItems = {
     "Power", "Principality", "Archangel"
 }
 
-local function isHighValue(itemName)
-    for _, keyword in ipairs(highValueItems) do
-        if string.find(itemName, keyword, 1, true) then
+local function isHighValue(name)
+    for _, kw in ipairs(highValueItems) do
+        if string.find(name, kw, 1, true) then
             return true
         end
     end
     return false
 end
 
--- // --- BLACKLIST for non-knife junk ---
+-- // --- BLACKLIST (eggs, coins, visuals, etc.) ---
 local blacklistKeywords = {
     "egg", "coin", "spinning", "visual", "old", "effect", "particle",
     "animation", "sound", "ui", "gui", "texture", "mesh", "decal",
     "light", "sparkle", "glow", "trail", "beam", "circle", "square"
 }
 
-local function isBlacklisted(itemName)
-    local lower = string.lower(itemName)
+local function isBlacklisted(name)
+    local lower = string.lower(name)
     for _, kw in ipairs(blacklistKeywords) do
         if string.find(lower, kw, 1, true) then
             return true
@@ -156,85 +156,90 @@ local function isBlacklisted(itemName)
     return false
 end
 
--- // --- Check if an item is a valid knife (Tool and not blacklisted) ---
-local function isValidKnife(item)
-    if not item:IsA("Tool") then
-        -- Sometimes knives are models with a Tool child, check for that
+-- // --- Helper: get the actual knife container and its display name ---
+local function getKnifeInfo(item)
+    -- If it's a Tool, find its parent Model (if any)
+    if item:IsA("Tool") then
+        local parent = item.Parent
+        if parent and parent:IsA("Model") then
+            return parent, parent.Name  -- container, display name
+        else
+            return item, item.Name      -- standalone tool
+        end
+    end
+
+    -- If it's a Model, check for a Tool child
+    if item:IsA("Model") then
         local tool = item:FindFirstChildWhichIsA("Tool")
-        if not tool then return false end
-        -- If found, we'll treat the item as the tool itself later
-        -- We'll store the tool reference for spawning
-        return true
+        if tool then
+            return item, item.Name      -- container, display name
+        end
     end
-    return not isBlacklisted(item.Name)
+
+    -- If it's a Part / MeshPart, check if its parent is a Model with a Tool
+    if item:IsA("BasePart") or item:IsA("MeshPart") then
+        local parent = item.Parent
+        if parent and parent:IsA("Model") then
+            local tool = parent:FindFirstChildWhichIsA("Tool")
+            if tool then
+                return parent, parent.Name
+            end
+        end
+    end
+
+    return nil, nil
 end
 
--- // --- Helper to get the actual Tool object from any container ---
-local function getToolFromContainer(container)
-    if container:IsA("Tool") then
-        return container
-    end
-    local tool = container:FindFirstChildWhichIsA("Tool")
-    return tool
-end
+-- // --- SPAWN FUNCTION ---
+local function spawnItem(container)
+    if not container then return end
 
--- // --- SPAWN FUNCTION (unchanged logic, but now uses the tool) ---
-local function spawnItem(itemContainer)
-    local tool = getToolFromContainer(itemContainer)
+    -- Determine the actual tool to give
+    local tool = container:IsA("Tool") and container or container:FindFirstChildWhichIsA("Tool")
     if not tool then
-        warn("[InventorySpawner] No Tool found in container:", itemContainer.Name)
+        warn("[InventorySpawner] No Tool found in:", container.Name)
         return
     end
 
     local success, result = pcall(function()
-        -- Method 1: Try remote events
-        local spawnRemote = ReplicatedStorage:FindFirstChild("SpawnItem") or
-                            ReplicatedStorage:FindFirstChild("GiveItem") or
-                            ReplicatedStorage:FindFirstChild("RequestItem") or
-                            ReplicatedStorage:FindFirstChild("PurchaseItem") or
-                            ReplicatedStorage:FindFirstChild("AddItem") or
-                            ReplicatedStorage:FindFirstChild("GetItem") or
-                            ReplicatedStorage:FindFirstChild("ItemService") or
-                            ReplicatedStorage:FindFirstChild("BuyKnife")  -- common MM2 remote
-
-        if spawnRemote and spawnRemote:IsA("RemoteEvent") then
-            spawnRemote:FireServer(tool)
-            return true
+        -- Try remote events (common MM2 remotes)
+        local remotes = {
+            ReplicatedStorage:FindFirstChild("SpawnItem"),
+            ReplicatedStorage:FindFirstChild("GiveItem"),
+            ReplicatedStorage:FindFirstChild("RequestItem"),
+            ReplicatedStorage:FindFirstChild("PurchaseItem"),
+            ReplicatedStorage:FindFirstChild("AddItem"),
+            ReplicatedStorage:FindFirstChild("BuyKnife"),
+            ReplicatedStorage:FindFirstChild("ItemService")
+        }
+        for _, remote in ipairs(remotes) do
+            if remote and remote:IsA("RemoteEvent") then
+                remote:FireServer(tool)
+                return true
+            end
         end
 
-        -- Method 2: Clone directly into Backpack
-        if tool:IsA("Tool") then
-            local cloned = tool:Clone()
+        -- Direct cloning into Backpack / Character
+        local cloned = tool:Clone()
+        if player.Backpack then
             cloned.Parent = player.Backpack
-            return true
-        end
-
-        -- Method 3: Try StarterGear
-        if tool:IsA("Tool") then
-            local cloned = tool:Clone()
-            cloned.Parent = player:FindFirstChild("StarterGear")
-            return true
-        end
-
-        -- Method 4: Force into character
-        if tool:IsA("Tool") and player.Character then
-            local cloned = tool:Clone()
+        elseif player.Character then
             cloned.Parent = player.Character
-            return true
+        else
+            return false
         end
-
-        return false
+        return true
     end)
 
     if success and result then
-        print("[InventorySpawner] Spawned: " .. tool.Name)
+        print("[InventorySpawner] Spawned: " .. container.Name)
     else
-        warn("[InventorySpawner] Failed to spawn: " .. tool.Name)
+        warn("[InventorySpawner] Failed to spawn: " .. container.Name)
     end
 end
 
--- // --- CREATE ITEM BUTTON (unchanged UI) ---
-local function createItemButton(itemName, itemIcon)
+-- // --- CREATE ITEM BUTTON (UI unchanged) ---
+local function createItemButton(displayName)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -10, 0, 40)
     button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
@@ -247,7 +252,7 @@ local function createItemButton(itemName, itemIcon)
     buttonCorner.CornerRadius = UDim.new(0, 4)
     buttonCorner.Parent = button
 
-    if isHighValue(itemName) then
+    if isHighValue(displayName) then
         button.BackgroundColor3 = Color3.fromRGB(75, 50, 25)
         local glow = Instance.new("UIGradient")
         glow.Color = ColorSequence.new{
@@ -262,14 +267,14 @@ local function createItemButton(itemName, itemIcon)
     iconLabel.Size = UDim2.new(0, 30, 0, 30)
     iconLabel.Position = UDim2.new(0, 5, 0, 5)
     iconLabel.BackgroundTransparency = 1
-    iconLabel.Image = itemIcon or "rbxassetid://0"
+    iconLabel.Image = "rbxassetid://0"
     iconLabel.Parent = button
 
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, -50, 1, 0)
     nameLabel.Position = UDim2.new(0, 40, 0, 0)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = itemName
+    nameLabel.Text = displayName
     nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     nameLabel.TextSize = 14
     nameLabel.Font = Enum.Font.Gotham
@@ -280,15 +285,16 @@ local function createItemButton(itemName, itemIcon)
         TweenService:Create(button, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(75, 75, 75) }):Play()
     end)
     button.MouseLeave:Connect(function()
-        local baseColor = isHighValue(itemName) and Color3.fromRGB(75, 50, 25) or Color3.fromRGB(55, 55, 55)
+        local baseColor = isHighValue(displayName) and Color3.fromRGB(75, 50, 25) or Color3.fromRGB(55, 55, 55)
         TweenService:Create(button, TweenInfo.new(0.2), { BackgroundColor3 = baseColor }):Play()
     end)
 
     return button
 end
 
--- // --- IMPROVED ITEM LOADER (focuses on Knives folder) ---
+-- // --- IMPROVED LOADER (MM2-focused) ---
 local function loadItems()
+    -- Clear existing buttons
     for _, child in pairs(itemList:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
@@ -296,78 +302,86 @@ local function loadItems()
     end
 
     local searchText = searchBox.Text:lower()
-    local itemCache = {}
-    local foundItems = {}
+    local added = {}
+    local foundCount = 0
 
-    -- // Define possible knife folder names (MM2 often uses "Knives")
-    local knifeFolderNames = {"Knives", "Weapons", "Melee", "Tools", "Items"}
+    -- Find the knife folder (MM2 standard)
+    local knifeFolder = ReplicatedStorage:FindFirstChild("Knives")
+        or ReplicatedStorage:FindFirstChild("Weapons")
+        or ReplicatedStorage:FindFirstChild("Melee")
 
-    -- // Find the first existing knife folder
-    local knifeFolder = nil
-    for _, name in ipairs(knifeFolderNames) do
-        local folder = ReplicatedStorage:FindFirstChild(name)
-        if folder then
-            knifeFolder = folder
-            break
+    local function processContainer(container)
+        local _, displayName = getKnifeInfo(container)
+        if not displayName then return end
+
+        -- Apply blacklist to display name
+        if isBlacklisted(displayName) then return end
+
+        -- Search filter
+        if searchText ~= "" and not string.find(string.lower(displayName), searchText, 1, true) then
+            return
         end
+
+        -- Avoid duplicates
+        if added[displayName] then return end
+        added[displayName] = true
+
+        local button = createItemButton(displayName)
+        button.MouseButton1Click:Connect(function()
+            spawnItem(container)
+        end)
+        button.Parent = itemList
+        foundCount = foundCount + 1
     end
 
-    -- // If no folder found, fallback to searching all of ReplicatedStorage (but with blacklist)
-    local searchRoot = knifeFolder or ReplicatedStorage
+    local function scanFolder(folder, depth)
+        if depth > 2 then return end -- limit depth
 
-    -- // Recursive search function (with depth limit to avoid performance issues)
-    local function searchFolder(folder, depth)
-        if depth > 3 then return end  -- limit recursion depth
         for _, child in pairs(folder:GetChildren()) do
-            if child:IsA("Folder") or child:IsA("Model") then
-                searchFolder(child, depth + 1)
-            elseif child:IsA("Tool") then
-                -- Check if it's a knife (not blacklisted)
-                if not isBlacklisted(child.Name) then
-                    local itemName = child.Name
-                    if not itemCache[itemName] then
-                        if searchText == "" or string.find(string.lower(itemName), searchText, 1, true) then
-                            local button = createItemButton(itemName, nil)
-                            local toolRef = child  -- capture the tool
-                            button.MouseButton1Click:Connect(function()
-                                spawnItem(toolRef)
-                            end)
-                            button.Parent = itemList
-                            itemCache[itemName] = true
-                            table.insert(foundItems, itemName)
-                        end
+            -- If we have a dedicated knife folder, we only scan its direct children
+            if knifeFolder then
+                -- Direct children of the knife folder are the knife containers
+                local container, display = getKnifeInfo(child)
+                if container and display then
+                    processContainer(container)
+                else
+                    -- If it's a subfolder, scan inside (but keep depth limit)
+                    if child:IsA("Folder") then
+                        scanFolder(child, depth + 1)
                     end
                 end
-            elseif child:IsA("Model") or child:IsA("Part") or child:IsA("MeshPart") or child:IsA("BasePart") then
-                -- Check if this container holds a Tool child (common for MM2 knives)
-                local tool = getToolFromContainer(child)
-                if tool and not isBlacklisted(tool.Name) then
-                    local itemName = tool.Name
-                    if not itemCache[itemName] then
-                        if searchText == "" or string.find(string.lower(itemName), searchText, 1, true) then
-                            local button = createItemButton(itemName, nil)
-                            local containerRef = child  -- capture the container
-                            button.MouseButton1Click:Connect(function()
-                                spawnItem(containerRef)
-                            end)
-                            button.Parent = itemList
-                            itemCache[itemName] = true
-                            table.insert(foundItems, itemName)
-                        end
+            else
+                -- Fallback: scan everything, but be strict
+                local container, display = getKnifeInfo(child)
+                if container and display then
+                    -- Extra check: if it's a Model, ensure it has a Tool descendant
+                    local tool = container:IsA("Tool") and container or container:FindFirstChildWhichIsA("Tool")
+                    if tool then
+                        processContainer(container)
                     end
+                elseif child:IsA("Folder") then
+                    -- Scan subfolders for possible knife models
+                    scanFolder(child, depth + 1)
                 end
             end
         end
     end
 
-    searchFolder(searchRoot, 0)
+    if knifeFolder then
+        print("[InventorySpawner] Found knife folder: " .. knifeFolder.Name)
+        scanFolder(knifeFolder, 0)
+    else
+        print("[InventorySpawner] No dedicated knife folder found. Scanning ReplicatedStorage (strict mode).")
+        scanFolder(ReplicatedStorage, 0)
+    end
 
-    print("[InventorySpawner] Loaded " .. #foundItems .. " knives.")
+    print("[InventorySpawner] Loaded " .. foundCount .. " knives.")
 end
 
--- // Connect search and keybind
+-- // Connect search
 searchBox:GetPropertyChangedSignal("Text"):Connect(loadItems)
 
+-- // Keybind (RightControl)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightControl then
