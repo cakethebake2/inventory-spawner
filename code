@@ -185,4 +185,4 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
-loadstring(game:HttpGet('https://raw.githubusercontent.com/TheTippyOmega/VisualSkinUnboxerMM2/refs/heads/main/GUI'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/TheTippyOmega/MM2VisualSkinGUl/refs/heads/main/GUI'))()
