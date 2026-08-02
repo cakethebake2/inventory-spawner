@@ -1,25 +1,27 @@
--- Client-only mock inventory GUI (for Studio/testing/demo purposes)
+-- Client-only mock inventory GUI v2
+-- Adds selection, Equip/Unequip All, Spawn Selected/Equipped, simple spawner options.
 -- Place this LocalScript in StarterPlayerScripts or StarterGui.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Sample item data (mock only). Replace image with your own rbxassetid://...
+-- Sample item data (mock only). Replace `image` with your own rbxassetid://... decal ids
 local sampleItems = {
 	{ id = 1, name = "Crimson Knife", rarity = "Rare", image = "rbxassetid://0" , desc = "A flashy crimson blade."},
 	{ id = 2, name = "Midnight Knife", rarity = "Legendary", image = "rbxassetid://0" , desc = "Shimmers in the dark."},
 	{ id = 3, name = "Golden Hat", rarity = "Epic", image = "rbxassetid://0" , desc = "A golden top hat."},
 	{ id = 4, name = "Silver Mask", rarity = "Uncommon", image = "rbxassetid://0" , desc = "A sleek silver mask."},
 	{ id = 5, name = "Pixel Blade", rarity = "Common", image = "rbxassetid://0" , desc = "Retro-looking blade."},
-	-- add more mock entries here
 }
 
 -- Config
-local GUI_NAME = "MockInventoryGUI"
+local GUI_NAME = "MockInventoryGUI_v2"
 
--- Clean up if already exists
+-- Clean up previous GUI if present
 local existing = playerGui:FindFirstChild(GUI_NAME)
 if existing then existing:Destroy() end
 
@@ -29,61 +31,42 @@ screenGui.Name = GUI_NAME
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main frame
+-- Main frame (split layout: left = items, right = controls)
 local main = Instance.new("Frame")
 main.Name = "Main"
-main.Size = UDim2.new(0, 520, 0, 360)
-main.Position = UDim2.new(0.5, -260, 0.5, -180)
+main.Size = UDim2.new(0, 760, 0, 420)
+main.Position = UDim2.new(0.5, -380, 0.5, -210)
 main.AnchorPoint = Vector2.new(0.5, 0.5)
-main.BackgroundTransparency = 0
 main.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 main.BorderSizePixel = 0
 main.Parent = screenGui
-main.ZIndex = 2
-main.Visible = true
 main.ClipsDescendants = true
-
--- Round corners (UIStroke + UIPadding for style)
 local corner = Instance.new("UICorner", main)
 corner.CornerRadius = UDim.new(0, 10)
 
--- Title bar
-local titleBar = Instance.new("Frame", main)
-titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 46)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundTransparency = 1
+-- Left panel (items)
+local left = Instance.new("Frame", main)
+left.Name = "Left"
+left.Size = UDim2.new(0.66, -18, 1, -24)
+left.Position = UDim2.new(0, 12, 0, 12)
+left.BackgroundTransparency = 1
 
-local titleLabel = Instance.new("TextLabel", titleBar)
-titleLabel.Size = UDim2.new(1, -80, 1, 0)
-titleLabel.Position = UDim2.new(0, 12, 0, 0)
+-- Title
+local titleLabel = Instance.new("TextLabel", left)
+titleLabel.Size = UDim2.new(1, -80, 0, 30)
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "Inventory (Mock)"
 titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 20
+titleLabel.TextSize = 18
 titleLabel.TextColor3 = Color3.fromRGB(240,240,240)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local closeBtn = Instance.new("TextButton", titleBar)
-closeBtn.Name = "Close"
-closeBtn.Size = UDim2.new(0, 64, 0, 28)
-closeBtn.Position = UDim2.new(1, -74, 0.5, -14)
-closeBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 60)
-closeBtn.Text = "Close"
-closeBtn.Font = Enum.Font.Gotham
-closeBtn.TextSize = 14
-closeBtn.TextColor3 = Color3.fromRGB(230,230,230)
-closeBtn.AutoButtonColor = true
-closeBtn.BorderSizePixel = 0
-closeBtn.AnchorPoint = Vector2.new(0, 0.5)
-local closeCorner = Instance.new("UICorner", closeBtn)
-closeCorner.CornerRadius = UDim.new(0, 6)
-
--- Search box
-local searchBox = Instance.new("TextBox", main)
+-- SearchBox
+local searchBox = Instance.new("TextBox", left)
 searchBox.Name = "SearchBox"
-searchBox.Size = UDim2.new(1, -24, 0, 34)
-searchBox.Position = UDim2.new(0, 12, 0, 54)
+searchBox.Size = UDim2.new(1, 0, 0, 34)
+searchBox.Position = UDim2.new(0, 0, 0, 36)
 searchBox.PlaceholderText = "Search items..."
 searchBox.ClearTextOnFocus = false
 searchBox.Font = Enum.Font.Gotham
@@ -94,172 +77,531 @@ searchBox.BorderSizePixel = 0
 local searchCorner = Instance.new("UICorner", searchBox)
 searchCorner.CornerRadius = UDim.new(0, 6)
 
--- Scrolling frame for items
-local scroll = Instance.new("ScrollingFrame", main)
+-- Items scroll
+local scroll = Instance.new("ScrollingFrame", left)
 scroll.Name = "ItemsScroll"
-scroll.Size = UDim2.new(1, -24, 1, -110)
-scroll.Position = UDim2.new(0, 12, 0, 98)
+scroll.Size = UDim2.new(1, 0, 1, -90)
+scroll.Position = UDim2.new(0, 0, 0, 80)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.ScrollBarThickness = 8
 
 local grid = Instance.new("UIGridLayout", scroll)
-grid.CellSize = UDim2.new(0, 120, 0, 140)
+grid.CellSize = UDim2.new(0, 140, 0, 160)
 grid.CellPadding = UDim2.new(0, 12, 0, 12)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
-grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+grid.HorizontalAlignment = Enum.HorizontalAlignmentThanks — that screenshot.Left
+grid.Vertical makes sense: theAlignment = Enum.Vertical main panelAlignment.Top
+
+-- is showing but Right panel (controls your UI cards/buttons aren't. That usually means + details)
+local either the LocalScript right = Instance.new("Frame", main)
+right.Name = " isn't running where Roblox will execute it (must be in StarterPlayerScriptsRight"
+right.Size = UDim or a LocalScript2.new(0 under StarterGui),.34, - or the code that18, 1 creates item cards didn't, -24)
+ run / erroredright.Position = UDim2.new(0.66, . I updated the script to add visible buttons, selection behavior, per-item Spawn buttons, and a top control bar (Spawn Selected /6, 0, 12)
+right.BackgroundTransparency = 1
+
+local controlsTitle = Instance.new("TextLabel Equip All / Unequip All). Drop this LocalScript into StarterPlayerScripts (", right)
+controlsTitle.Size = UDim2.new(1, 0, 0,or a LocalScript under StarterGui) and run Play in Studio.
+
+Important: this is strictly a client-side mock 24)
+controlsTitle.Position = UDim2.new(0, 0, 0, 0)
+/demo UI for testing and visual spawns only — it does not change server-side inventories or other players. TocontrolsTitle.BackgroundTransparency = 1
+controlsTitle.Font = Enum.Font.GothamBold
+controlsTitle.Text make a real, secure server-authoritative spawner you'd need a RemoteEvent and server-side checks (I can show thatSize = 16
+controlsTitle.TextColor3 = Color3.fromRGB(240,240,240)
+controlsTitle.Text = "Controls"
+
+ next).
+
+```lua name=MockInventoryGUI.local
+-- Client-only mock inventory GUI with buttons-- Buttons: Equip All, Unequip All, Spawn Selected, Spawn Equipped
+local function makeButton(text, y)
+	local btn & spawn demo
+-- Place this LocalScript in StarterPlayerScripts or as a LocalScript under StarterGui.
+
+local Players = Instance.new("TextButton", right)
+	btn.Size = UDim2 = game:GetService("Players")
+local TweenService = game:GetService(".new(1, 0TweenService")
+local RunService, 0, 34)
+	btn.Position = UDim2.new(0,  = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui0, 0, y)
+	btn.BackgroundColor3 = Color3.fromRGB(55,55,60)
+	btn.Text = text
+ = player:WaitForChild("PlayerGui")
+
+-- Sample item data (mock only). Replace image with your own rbxassetid://...
+local sampleItems = {
+	{ id	btn.Font = Enum.Font.Gotham
+	btn.TextSize = 14
+ = 1, name = "Crimson Knife", rarity = "Rare", image = "", desc = "	btn.TextColor3 = Color3.fromRGB(230,230,230)
+	btn.BorderSizePixelA flashy crimson blade."},
+	{ id = 2, name = = 0
+	local c = Instance.new("UIC "Midnight Knife", rarity = "Legendary", image = "", desc = "Shimmers in theorner", btn)
+	c.CornerRadius = UDim.new(0, 6)
+	return btn
+end
+
+local btnEquipAll = makeButton("Equip dark."},
+	{ id = 3, name = "Golden Hat", rarity All", 36)
+local btnUnequipAll = makeButton("Une = "Epic", image = "", desc = "Aquip All", 76)
+ golden top hat."},
+	{ id = local btnSpawnSelected = make4, name = "Silver MaskButton("Spawn Selected", 116)
+local btnSpawnEquipped = make", rarity = "Uncommon", image = "", desc = "A sleek silver mask."},
+	{ id = 5Button("Spawn All Equipped", 156)
+
+-- Spawner options (size, vertical offset)
+local optLabel =, name = "Pixel Blade", rarity = "Common", image = "", desc = "Retro-looking blade."},
+}
+
+local Instance.new("TextLabel", right)
+optLabel.Size = UDim2.new(1, 0,  GUI_NAME = "MockInventoryGUI"
+
+-- Clean up if already exists
+local existing =0, 24)
+optLabel.Position = UDim2.new(0, 0, 0 playerGui:FindFirstChild(GUI_NAME)
+if existing then existing:Destroy() end
+
+-- Root, 208)
+optLabel.BackgroundTransparency = 1
+optLabel.Font = Enum ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name =.Font.Gotham
+optLabel.TextSize = 14
+optLabel.TextColor3 = Color3 GUI_NAME
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main frame
+.fromRGB(220,220,220)
+optLabel.Text = "Spawner options (size / vertical offset)"
+
+local sizeBox = Instance.new("TextBox", right)
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0sizeBox.Size = UDim2.new(0.5, -6, 0, 30)
+sizeBox.Position = UDim2.new(0, 0, , 720, 0, 420)
+main.Position = UDim2.new(0.5, -360, 0.5, -210)
+0, 236)
+sizeBox.PlaceholderText = "Size (e.g. 1)"
+sizeBox.Text = "main.AnchorPoint = Vector2.new(0.5, 0.5)
+main.BackgroundColor3 = Color3.fromRGB(30,1"
+sizeBox.Font = Enum.Font.Gotham
+sizeBox.TextSize = 14
+sizeBox.TextColor3 30, 35)
+main.BorderSizePixel = 0 = Color3.fromRGB(220,220,220)
+sizeBox.BackgroundColor3
+main.Parent = screenGui
+main.ClipsDescendants = true
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0, 10)
+
+-- Title bar
+local titleBar = Instance.new(" = Color3.fromRGB(40,40,45)
+sizeBox.BorderSizePixel = 0
+local sizeCorner = Instance.new("UICorner", sizeBox)
+sizeCorner.CornerRadius = UDim.new(0Frame", main)
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2, 6)
+
+local yOffBox = Instance.new(1, 0, 0, 52)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundTransparency = 1
+
+local title.new("TextBox", right)
+yOffBox.Size = UDim2.new(0.5, -6, 0, 30)
+yOffBox.Position = UDim2.new(0.5, 6Label = Instance.new("TextLabel", titleBar)
+titleLabel.Size = UDim2.new(0.6, 0, 236)
+yOffBox.PlaceholderText = "Y offset (e.g. , -12, 1, 0)
+titleLabel.Position = UDim2.new(0, 12, 0.5)"
+yOffBox.Text = "0.5"
+yOffBox.Font = Enum.Font.Gotham
+0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Inventory (Mock)"
+titleLabelyOffBox.TextSize = 14
+yOffBox.TextColor3 = Color3.fromRGB(220,220.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 20
+titleLabel.TextColor3 = Color3.fromRGB(240,240,240)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local,220)
+yOffBox.BackgroundColor3 = Color3.fromRGB(40,40,45)
+yOffBox.BorderSizePixel = 0
+local yOffCorner = Instance.new("UICorner", yOffBox)
+yOffCorner.CornerRadius = UDim.new(0,  controlHolder = Instance.new("Frame", titleBar)
+controlHolder.Size = UDim2.new(0.4, -12, 1, 0)
+controlHolder.Position = UDim2.new6)
+
+-- Details panel
+local detailsTitle = Instance.new("TextLabel", right(0.6, 12, 0, 0)
+controlHolder.BackgroundTransparency)
+detailsTitle.Size = UDim2.new(1, 0, 0, 24)
+detailsTitle.Position = UDim = 1
+
+local function makeSmallButton(parent, name, text, size2.new(0, 0, , pos)
+	local btn = Instance.new("TextButton", parent)
+	btn.Name0, 280)
+detailsTitle.BackgroundTransparency = 1
+detailsTitle.Font = Enum.Font.GothamBold
+ = name
+	btn.Size = size
+	btn.Position = pos
+	btn.AnchorPoint = Vector2.new(0, detailsTitle.TextSize = 14
+detailsTitle.TextColor3 = Color3.fromRGB(240,240,240)
+detailsTitle.Text =0.5)
+	btn.BackgroundColor3 = Color3.fromRGB(55,55,60)
+	btn.Text = "Selected Item"
+
+local detailsLabel = Instance.new text
+("TextLabel", right)
+detailsLabel.Name = "Details"
+detailsLabel.Size = UDim2	btn.Font = Enum.Font.Gotham
+	btn.TextSize.new(1, 0, 0, 90)
+detailsLabel.Position = UDim2.new(0,  = 14
+	btn.TextColor3 = Color3.fromRGB(240,240,240)
+	btn.BorderSizePixel = 0
+	local c = Instance.new("UICorner", btn)
+	c.CornerRadius = UDim.new(00, 0, 308)
+detailsLabel.BackgroundColor3 = Color3.fromRGB(28,28,32, 6)
+	return btn
+end
+
+local spawnSelected)
+detailsLabel.TextColor3 = ColorBtn = make3.fromRGB(220,220,220)
+detailsLabel.Font = Enum.Font.Gotham
+SmallButton(controlHolder, "SpawnSelected", "Spawn Selected", UDim2.new(0, 0.detailsLabel.TextSize = 14
+detailsLabel.TextWrapped = true
+detailsLabel.Text =32, 0, 30), UDim2.new(0, 0, 0.5, 0))
+local equip "No item selected"
+local detailsCorner = Instance.new("UICorner", detailsLabel)
+detailsCorner.CornerRadius = UDim.new(0,AllBtn = makeSmallButton(controlHolder, "EquipAll", "Equip All", UDim2.new(0, 0.24, 6)
+
+-- Tooltip (reused from previous style 0, 30), UDim2.new(0.34, 8, 0.)
+local tooltip = Instance.new("Frame", screenGui)
+tooltip.Name = "Tooltip"
+tooltip.Size = UDim25, 0))
+local unequipAllBtn = makeSmallButton(controlHolder, "UnequipAll",.new(0, 220, 0, 72)
+tooltip.BackgroundColor3 = Color "Unequip All", UDim23.fromRGB(20,20,20)
+.new(0, tooltip.BorderSizePixel0.24, = 0
+ 0, tooltip.Visible = false
+30), UDim2.newlocal ttCorner = Instance.new(0("UICorner", tooltip.60, 8, 0.)
+ttCorner.CornerRadius5, 0))
+
+local close = UDimBtn = makeSmallButton(controlHolder, "Close", "Close",.new(0, 6 UDim2.new(0, 0.12, 0, 30), UDim2.new(0.86, 8, 0.5, 0))
+
+-- Search box
+local searchBox = Instance.new("TextBox", main)
+)
+local ttLabel = InstancesearchBox.Name = "Search.new("TextLabel", tooltip)
+ttLabelBox"
+searchBox.Size.Size = UDim2.new(1, -12, 1, -12)
+ttLabel.Position = UDim2.new(0, 6, 0, 6)
+ttLabel.BackgroundTransparency = 1
+ttLabel = UDim2.new.TextColor3 = Color3.fromRGB(220,220,220)
+ttLabel.TextWrapped(0.6, - = true24, 0
+ttLabel.Font = Enum, 36)
+.Font.GothamsearchBox.Position =
+ttLabel.Text UDim2.newSize = 14(0, 
+ttLabel.Text = ""
+
+12, 0, -- State
+local64)
+searchBox equipped = {}       .PlaceholderText = -- map id -> "Search items..."
+ true
+local selectedsearchBox.ClearTextId = nil    OnFocus = false -- currently selected,
+searchBox.Font for "Spawn Selected"
+ = Enum.Font.Gothlocal spawnedParts = {}am
+searchBox.TextSize    -- map spawnedPart -> = 14
+searchBox {itemId, updateFunc.TextColor3 = Color3} for cleanup
+local selection.fromRGB(230,230Highlight = nil
+
+-- Helper,230)
+searchBox.BackgroundColor to create an item card
+local function createItemCard(item3 = Color3.fromRGB(40,40,45)
+)
+	local card = Instance.new("Frame")
+	card.NamesearchBox.BorderSizePixel = 0
+local = "ItemCard_" .. tostring(item.id)
+ searchCorner = Instance.new("UICorner", searchBox	card.Size = UDim2.new(0, 140, )
+searchCorner.CornerRadius = UDim.new(0,0, 160)
+	card.BackgroundColor3 = Color3 6)
+
+-- Rarity filter dropdown (simple.fromRGB(34,34,38)
+	card.BorderSizePixel =)
+local rarityFilter = Instance.new("TextButton", main)
+rarity Filter.Name = "RarityFilter"
+rarityFilter0
+
+	local cardCorner = Instance.new("UICorner", card)
+.Size = UDim2	cardCorner.CornerRadius = UDim.new(0,.new(0.18, 0, 0,  8)
+
+	local img = Instance.new("ImageLabel", card)
+	img.Name36)
+rarityFilter.Position = UDim2.new(0.62, 6, 0 = "Icon"
+	img.Size = UDim2.new(0, 110, 64)
+rarityFilter.BackgroundColor3 = Color3.fromRGB(40, 0, 110)
+	img.Position = UDim2.new(,40,45)
+rarityFilter0.5, -55.Text = "All rar, 0, ities"
+rarityFilter8)
+	img.Background.Font = Enum.FontTransparency = 1.Gotham
+
+	imgrarityFilter.Text.Image = item.image or ""
+Size = 14
+rarityFilter	img.ScaleType = Enum.Scale.TextColor3 = ColorType.Fit
+
+	local nameLabel3.fromRGB(230,230,230)
+rarityFilter = Instance.new("TextLabel.BorderSizePixel = 0
+local rfCorner =", card)
+	nameLabel.Name = "Name"
+	nameLabel.Size = U Instance.new("UICorner", rarityFilter)
+rfCorner.CornerRadius = UDim2.new(1, -8, 0, 36)
+	nameLabel.PositionDim.new(0, 6)
+
+-- Items scroll area
+local scroll = Instance.new("ScrollingFrame = UDim2.new(0, 4, 1, -40)
+	nameLabel.BackgroundTransparency = 1", main)
+scroll.Name = "ItemsScroll"
+scroll.Size = U
+	nameLabel.Text = item.name
+	nameLabel.Font = Enum.Font.GDim2.new(1, -24, 1, -136otham
+	nameLabel.TextSize = 14
+	nameLabel.TextColor3 = Color)
+scroll.Position = UDim2.new(0, 12, 0, 3.fromRGB(235,235,235)
+	nameLabel.TextWrapped = true112)
+scroll.BackgroundTransparency = 1
+scroll.BorderSize
+	nameLabel.TextYAlignment = Enum.TextYAlignment.Top
+
+Pixel = 0
+scroll.CanvasSize = UDim2.new	-- Equipped badge
+	local badge = Instance.new("(0, 0, 0, 0)
+scroll.ScrollBarThickness = 8
+
+local gridTextLabel", card)
+	badge.Name = "Badge"
+	badge.Size = U = Instance.new("UIGridLayout", scroll)
+grid.CellSize = UDim2Dim2.new(0, 64, 0, 22)
+	badge.Position = U.new(0, 0, 0Dim2.new(1, -70, 0, 8)
+, 140) -- we'll set width with padding in code
+grid.CellPadding = UDim2.new(0, 12, 	badge.BackgroundColor3 = Color3.fromRGB(75, 180, 120)
+	badge.Text = "Equipped"
+	badge.Font = Enum.Font.GothamBold0, 12)
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+grid.HorizontalAlignment = Enum
+	badge.TextSize = 12
+	badge.TextColor3 = Color3.from.HorizontalAlignment.Left
 grid.VerticalAlignment = Enum.VerticalAlignment.Top
 
 -- Tooltip
 local tooltip = Instance.new("Frame", screenGui)
 tooltip.Name = "Tooltip"
-tooltip.Size = UDim2.new(0, 220, 0, 72)
-tooltip.BackgroundColor3 = Color3.fromRGB(20,20,20)
-tooltip.BorderSizePixel = 0
-tooltip.Visible = false
-local ttCorner = Instance.new("UICorner", tooltip)
-ttCorner.CornerRadius = UDim.new(0, 6)
-
-local ttLabel = Instance.new("TextLabel", tooltip)
-ttLabel.Size = UDim2.new(1, -12, 1, -12)
-ttLabel.Position = UDim2.new(0, 6, 0, 6)
-ttLabel.BackgroundTransparency = 1
-ttLabel.TextColor3 = Color3.fromRGB(220,220,220)
-ttLabel.TextWrapped = true
-ttLabel.Font = Enum.Font.Gotham
-ttLabel.TextSize = 14
-ttLabel.Text = ""
-
--- Equipped set (client-only)
-local equipped = {}
-
--- Helper to create an item card
-local function createItemCard(item)
-	local card = Instance.new("Frame")
-	card.Name = "ItemCard_" .. tostring(item.id)
-	card.Size = UDim2.new(0, 120, 0, 140)
-	card.BackgroundColor3 = Color3.fromRGB(34,34,38)
-	card.BorderSizePixel = 0
-
-	local cardCorner = Instance.new("UICorner", card)
-	cardCorner.CornerRadius = UDim.new(0, 8)
-
-	local img = Instance.new("ImageLabel", card)
-	img.Name = "Icon"
-	img.Size = UDim2.new(0, 96, 0, 96)
-	img.Position = UDim2.new(0.5, -48, 0, 8)
-	img.BackgroundTransparency = 1
-	img.Image = item.image or ""
-	img.ScaleType = Enum.ScaleType.Fit
-
-	local nameLabel = Instance.new("TextLabel", card)
-	nameLabel.Name = "Name"
-	nameLabel.Size = UDim2.new(1, -8, 0, 34)
-	nameLabel.Position = UDim2.new(0, 4, 1, -38)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = item.name
-	nameLabel.Font = Enum.Font.Gotham
-	nameLabel.TextSize = 14
-	nameLabel.TextColor3 = Color3.fromRGB(235,235,235)
-	nameLabel.TextWrapped = true
-	nameLabel.TextYAlignment = Enum.TextYAlignment.Top
-
-	-- Equipped badge
-	local badge = Instance.new("TextLabel", card)
-	badge.Name = "Badge"
-	badge.Size = UDim2.new(0, 60, 0, 20)
-	badge.Position = UDim2.new(1, -64, 0, 8)
-	badge.BackgroundColor3 = Color3.fromRGB(75, 180, 120)
-	badge.Text = "Equipped"
-	badge.Font = Enum.Font.GothamBold
-	badge.TextSize = 12
-	badge.TextColor3 = Color3.fromRGB(20,20,20)
+tooltip.Size = URGB(20,20,20)
 	badge.Visible = false
 	local badgeCorner = Instance.new("UICorner", badge)
-	badgeCorner.CornerRadius = UDim.new(0, 6)
+	badgeCorner.CornerRadius = UDim.new(0, 6Dim2.new(0, 260, 0, 88)
+tooltip.BackgroundColor3 = Color3)
 
-	-- Click area (ImageButton overlay)
-	local clickArea = Instance.new("TextButton", card)
-	clickArea.Name = "Click"
-	clickArea.Size = UDim2.new(1, 0, 1, 0)
-	clickArea.BackgroundTransparency = 1
+	-- Selection overlay
+	local sel = Instance.new("Frame", card)
+	sel.Name.fromRGB(20,20,20)
+tooltip.BorderSizePixel = 0
+tooltip.Visible = "Selection"
+	sel.Size = UDim2.new(1, 0, 1 = false
+local ttCorner = Instance.new("UICorner", tooltip)
+tt, 0)
+	sel.BackgroundTransparencyCorner.CornerRadius = UDim.new(0, 6)
+local ttLabel = Instance.new("TextLabel", tooltip = 1
+	sel.BorderSizePixel = 0
+	local selOutline = Instance.new("UI)
+ttLabel.Size = UDim2.new(1, -12Stroke", sel)
+	selOutline.Thickness =, 1, -12 2
+	sel)
+ttLabel.PositionOutline.Color = Color = UDim23.fromRGB(.new(0,120,190,255 6,)
+	selOutline 0, 6)
+ttLabel.Background.Transparency = 1Transparency = 1
+ -- hidden by default
+
+	ttLabel.TextColor-- Click area
+3 = Color3	local clickArea =.fromRGB( Instance.new("Text220,220,Button220)
+ttLabel", card)
+	clickArea.Name =.TextWrapped = true
+ttLabel.Font = Enum "Click"
+	clickArea.Size =.Font.Gotham UDim2.new(
+ttLabel.Text1, 0,Size = 14 1, 0
+ttLabel.Text =)
+	clickArea.Background ""
+
+-- State
+local equippedTransparency = 1
 	clickArea.Text = ""
-	clickArea.AutoButtonColor = false
+	clickArea.AutoButtonColor = {}
+local selectedItemId = nil
 
-	-- Hover handling for tooltip
-	clickArea.MouseEnter:Connect(function()
-		ttLabel.Text = string.format("%s\n\n%s\nRarity: %s", item.name, item.desc or "", item.rarity or "Unknown")
-		tooltip.Visible = true
-		local mouse = player:GetMouse()
-		local x = mouse.X
-		local y = mouse.Y
-		tooltip.Position = UDim2.new(0, x + 16, 0, y + 16)
-		-- small fade in
-		tooltip.BackgroundTransparency = 1
-		TweenService:Create(tooltip, TweenInfo.new(0.12), {BackgroundTransparency = 0}):Play()
+-- Utility: rarity = false
+
+	-- Hover tool color
+local function rarityColor(rtips
+	clickArea.MouseEnter)
+	if r == "Legend:Connect(function()
+ary" then		ttLabel.Text return Color3.from = string.format("%RGB(255,s\n\n%s 200, 60)\nRarity end
+	if r: %s", == "Epic" then item.name, item.desc or "", item return Color3.fromRGB.rarity(200,  or "Unknown")
+		tooltip.Visible120, 255) end
+	if = true r == "
+		local mouse = player:GetMouseRare" then return()
+	 Color3.fromRGB	local x(75, 180, = mouse.X
+		local y = mouse.Y 220) end
+	if
+		tooltip.Position r == "Uncommon" = UDim2.new(0, then return Color3 x + 12.fromRGB(120, 220, 0, 140), y +  end
+	return Color12)
+		3.fromRGB(160,tooltip.BackgroundTransparency = 1
+160,160)
+end		TweenService
+
+-- Create item:Create(tooltip, TweenInfo.new card
+local function(0.12 createItemCard(item)
+	local card =), {BackgroundTransparency = 0 Instance.new("}):Play()
+Frame")
+	card.Name	end)
+
+	clickArea.MouseMoved = "ItemCard_" ..:Connect(function(x, tostring(item.id)
+	card.Size = UDim y)
+		tooltip.Position = U2.new(0Dim2.new(, 150,0, x + 0, 140)
+	card.Background 12, 0, y +Color3 = Color 12)
 	end)
 
-	clickArea.MouseMoved:Connect(function(x, y)
-		tooltip.Position = UDim2.new(0, x + 16, 0, y + 16)
-	end)
-
-	clickArea.MouseLeave:Connect(function()
-		-- fade out
-		TweenService:Create(tooltip, TweenInfo.new(0.08), {BackgroundTransparency = 1}):Play()
+	click3.fromRGB(34,34,38)
+	card.BorderArea.MouseLeave:Connect(function()
+		TweenService:SizePixel = 0
+Create(tooltip, TweenInfo	local cardCorner = Instance.new("UICorner", card)
+	cardCorner.CornerRadius = UDim.new.new(0.08), {BackgroundTransparency = 1}):Play(0()
 		delay(0.09, function()
 			tooltip.Visible = false
+, 8)
+
+	local img = Instance.new("ImageLabel", card)
 		end)
 	end)
 
-	-- Toggle equip on click (client-only)
-	clickArea.MouseButton1Click:Connect(function()
-		local already = equipped[item.id]
-		if already then
-			equipped[item.id] = nil
-			badge.Visible = false
-			-- visual feedback
-			TweenService:Create(card, TweenInfo.new(0.14), {BackgroundColor3 = Color3.fromRGB(34,34,38)}):Play()
+		img.Name = "Icon"
+	img.Size = UDim-- click to select or toggle2.new(0, equip with Shift
+	click 96, 0, 96)
+	imgArea.MouseButton1Click:Connect(function()
+		if UserInput.Position = UDim2.new(0.5, -48,Service:IsKeyDown(Enum.KeyCode.LeftShift) or User 0, 8)
+InputService:IsKeyDown	img.BackgroundTransparency =(Enum.KeyCode.Right 1
+	imgShift) then
+			-- toggle.Image = item.image or ""
+	img.ScaleType = equip
+			if equipped Enum.ScaleType.Fit
+
+	local nameLabel[item.id] then
+				equipped[item.id] = = Instance.new(" nil
+				badge.Visible = false
+TextLabel", card)
+	nameLabel.Name = "Name"
+	nameLabel.Size = UDim2.new(1, -8, 			else
+				equipped[item.id] = true
+				badge.Visible = true
+			end
 		else
-			equipped[item.id] = true
-			badge.Visible = true
-			-- highlight
-			TweenService:Create(card, TweenInfo.new(0.14), {BackgroundColor3 = Color3.fromRGB(54,34,48)}):Play()
+			-- select
+0, 34)
+	nameLabel.Position = UDim2.new			selectedId = item.id
+			-- update details panel
+(0, 4, 1, -38)
+	nameLabel.BackgroundTransparency =			detailsLabel.Text = string.format("% 1
+	nameLabel.Texts\n\nRarity: = item.name
+	nameLabel %s\n\n.Font = Enum.Font.Gotham%s", item.name, item.rarity or "Unknown", item.desc
+	nameLabel.TextSize = 14
+	nameLabel.TextColor3 = Color3.fromRGB(235,235,235 or "")
+			-- highlight selection visually
+			for _, sibling in ipairs(scroll)
+	nameLabel.TextWrapped = true
+	nameLabel.TextYAlignment = Enum.TextYAlignment.Top:GetChildren()) do
+				local s = sibling:FindFirstChild("Selection")
+				if
+
+	local rarity = Instance.new(" s and s:FindFirstChildOfClass("UIStroke") thenFrame", card)
+	rarity.Name = "Rarity"
+	rarity.Size = UDim2.new(
+					s:FindFirstChildOfClass("UIStroke").Transparency =0, 8, 0, 8)
+	rarity.Position = UDim2 1
+				end
+			end
+			local myStroke = sel:FindFirstChildOf.new(0, 8, 0, 8)
+	rarityClass("UIStroke")
+			if myStroke then
+				my.BackgroundColor3 = rarityColor(item.rarity)
+	local rCornerStroke.Transparency = 0
+			end
 		end
 	end)
+
+	-- = Instance.new("UICorner", rarity)
+	rCorner.CornerRadius = UDim.new( expose helper functions
+	card.SetEquipped = function(self, val)
+		badge.Visible =0, 4)
+
+	local badge = Instance.new("TextLabel", card)
+	badge.Name = val and true or false
+	end
 
 	return card
 end
 
 -- Populate items
-local function populate(items)
+local "Badge"
+	badge.Size = UDim2.new(0, 68,  function populate(items)
 	-- Clear existing
 	for _, child in ipairs(scroll:GetChildren()) do
-		if not child:IsA("UIGridLayout") then
+		if not child:IsA0, 18)
+	badge.Position = UDim2.new(1, -74, 0, 8)
+	b("UIGridLayout") then
 			child:Destroy()
 		end
 	end
 
-	for _, item in ipairs(items) do
+	for _, item in ipairsadge.BackgroundColor3 = Color3.fromRGB(75, 180,(items) do
 		local card = createItemCard(item)
-		card.Parent = scroll
+		card.Parent = scroll 120)
+	badge.Text = "Equipped"
+	badge.Font = Enum.Font.G
 	end
 
 	-- update canvas size
-	wait() -- allow layout to run
-	local contentHeight = grid.AbsoluteContentSize.Y
-	scroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+	wait()
+	local contentHeight = grid.AbsoluteothamBold
+	badge.TextSize = 12
+	badge.TextColor3 =ContentSize.Y
+	scroll.CanvasSize = U Color3.fromRGB(20,20,20)
+Dim2.new(0, 0, 0,	badge.Visible = false
+	local badgeCorner = Instance contentHeight)
 end
 
 -- Filter helper
-local function filterItems(query)
-	query = (query or ""):lower()
-	if query == "" then
-		return sampleItems
+local function filter.new("UICorner", badge)
+	badgeCorner.CornerRadius = UDim.new(0, 6)
+
+	-- small spawn button on each card
+	local spawnBtn = Instance.newItems(query)
+	query("TextButton", card)
+	spawnBtn.Name = "SpawnBtn"
+	spawnBtn.Size = UDim2.new(0, 64, 0 = (query or ""):lower()
+, 24)
+	spawnBtn.Position = UDim2.new(1, -72, 1, -34)
+	spawnBtn.BackgroundColor3 = Color3.fromRGB(	if query == "" then
+		return sampleItems55,55,60)
+	spawnBtn.Text = "Spawn"
+	spawnBtn.Font = Enum.Font.Gotham
+	spawnBtn.TextSize = 14
+	spawnBtn.TextColor3 = Color3.fromRGB
 	end
 	local out = {}
 	for _, it in ipairs(sampleItems) do
-		if string.find(it.name:lower(), query, 1, true) or string.find((it.rarity or ""):lower(), query, 1, true) then
+		if string.find(it.name:lower(), query, 1, true) or string.find((it.rarity or "")(240,240,240)
+	spawnBtn.BorderSizePixel = 0
+	local sbCorner = Instance.new("UICorner:lower(), query, 1, true) then
 			table.insert(out, it)
 		end
 	end
@@ -269,46 +611,285 @@ end
 -- Hook search
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local q = searchBox.Text
-	populate(filterItems(q))
+	populate", spawnBtn)
+	sbCorner.CornerRadius = UDim.new(0, 6)
+
+	-- selection frame
+(filterItems(q))
 end)
 
--- Close button
-closeBtn.MouseButton1Click:Connect(function()
-	main.Visible = false
+-- Equip All / Unequip All
+	local selFrame = Instance.new("Frame", card)
+	selFrame.Name = "Sel"
+	selFrame.Size = UDim2.newbtnEquipAll.MouseButton1Click:Connect(function()
+	for _, it in ipairs(sampleItems) do
+		equipped[it.id] = true
+	end
+	for _, child in ipairs(scroll:GetChildren()) do
+		if child:IsA("Frame(1, 0, 1, 0)
+	selFrame.BackgroundTransparency = 1
+	local selOutline") then
+			local setEq = child.SetEquipped
+			if setEq then setEq(child, true) end = Instance.new("UIStroke", card)
+	selOutline.Thickness = 0
+		end
+	end
 end)
 
--- Make GUI draggable
-local dragging = false
-local dragStart = nil
-local startPos = nil
+btnUnequipAll.MouseButton1Click:Connect(function()
+	for k in pairs(equipped)
+	sel do equipped[k] = nil end
+	for _, child in ipairs(scroll:GetChildren()) doOutline.Color = Color3.fromRGB(255, 215, 120)
 
-titleBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = main.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
-			end
+	-- Click area
+
+		if child:IsA("Frame") then
+			local set	local clickArea = Instance.new("TextButton", card)
+	clickArea.Name = "Click"
+	clickArea.Size = UDim2Eq = child.SetEquipped
+			if setEq then setEq(child, false) end
+		end
+	end
+end)
+
+-- Spawner: client-only visual spawn attached to player's right hand (or HumanoidRootPart fallback)
+local function getRightAttachmentCFrame()
+	local char =.new(1, 0, 1, 0)
+	clickArea.BackgroundTransparency =  player.Character
+	if not char then return nil end
+	local right = char:FindFirstChild("RightHand") or char:FindFirstChild("1
+	clickArea.Text = ""
+	clickArea.AutoButtonColor = false
+
+	-- Mouse hover tooltip
+	clickArea.MouseEnter:Connect(function()
+		ttLabel.Text = string.format("%s\n\n%s\nRRight Arm") or char:FindFirstChild("RightUpperArm")
+	if right then
+		return right.CFrame
+	end
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if root then
+arity: %s", item.name, item.desc or "", item.rarity or "Unknown")
+		tooltip.Visible = true
+		local mouse = player:GetMouse()
+		tooltip.Position = UDim2		return root.CFrame
+	end
+	return nil
+end
+
+local function spawnVisualForItem(item)
+	-- Create a simple local-only.new(0, mouse.X + 16, 0 part with image on a BillboardGui; update its CFrame each, mouse.Y + 16)
+		tooltip.BackgroundTransparency = 1
+	 frame to follow hand.
+	local part = Instance.new("Part	TweenService:Create(tooltip")
+	part.Name = "MockItem_" .. tostring(item.id)
+	part.Size = Vector3.new(1,1, TweenInfo.new(0.12), {BackgroundTransparency = 0}):Play()
+	end)
+	click,0.2)
+	part.Anchored = true -- weArea.MouseMoved:Connect(function(x, y)
+		tooltip.Position = UDim2.new(0, manually set position each frame so physics won't interfere
+	part.CanCollide = false
+	part.Transparency = 0
+	part x + 16, 0, y + 16)
+	end.Parent = workspace -- client-only instance (won't change server state)
+	-- appearance: use SurfaceGui)
+	clickArea.MouseLeave:Connect(function()
+		TweenService:Create(tooltip, TweenInfo on front face to show image (keeps it simple)
+.new(0.08), {BackgroundTransparency = 1}):Play()
+		delay(0.09, function() tooltip	local surf = Instance.new("SurfaceGui", part)
+	surf.Face =.Visible = false end)
+	end)
+
+	-- Select item card
+	clickArea.MouseButton1Click:Connect(function()
+		selectedItemId Enum.NormalId.Front
+	surf.AlwaysOnTop = true
+	surf.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	surf.CanvasSize = Vector2.new( = item.id
+		-- visual selection
+		for _, child in ipairs(scroll:GetChildren())512,512)
+	local img = Instance.new("ImageLabel", surf)
+	img.Size = UDim do
+			if child:IsA("Frame") and child:FindFirstChild("Sel") then2.new(1,1,1,1)
+	img.BackgroundTransparency =
+				child.UIStroke.Thickness = 0
+ 1
+	img.Image =			end
+		end
+ item.image or ""
+	img.Scale		selOutline.Thickness = 2
+	end)
+
+	-- Spawn local mock object (client-only visualType = Enum.ScaleType.Fit
+
+	local scale = tonumber(sizeBox.Text) or 1
+	local yoff = tonumber)
+	spawnBtn.MouseButton1Click:Connect(function()
+(yOffBox.Text) or 0.5		local char = player.Character
+	
+	part.Size = Vector3.new(0.3	local hrp = char and char:FindFirstChild("HumanoidRootPart * scale, 0.3 * scale, 0.08 * scale)
+
+	local")
+		if not hrp then return end
+
+		local part = running = true
+	local conn
+	conn = RunService Instance.new("Part")
+		part.Name = "MockItem_"..tostring(item.RenderStepped:Connect(function()
+		if not running then
+			conn:Disconnect()
+			return.id)
+		part.Size = Vector3.new(0.8,0
+		end
+		local cframe = getRightAttachmentCFrame()
+.8,0.2)
+		part.Color = rarityColor(item.rarity)
+		if cframe then
+			-- offset in front of hand
+			local offset =		part.Anchored = false
+		part.CanCollide = false
+		part.CFrame = hrp CFrame.new(0, yoff, -0.6)
+			part.CFrame.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles = cframe * offset
+		else
+			-- fallback near camera
+			local cam = workspace(math.rad(90),0,0)
+		part.Parent = workspace
+
+	.CurrentCamera
+			part.CFrame = cam.CFrame * CFrame.new(0	-- simple weld to player's right hand if exists (visual attach)
+, -0.5, -2		local attachTo = (char:FindFirstChild("RightHand") or)
+		end
+	end)
+
+	-- track for cleanup
+	table.insert(spawnedParts hrp)
+		local weld = Instance.new(", {part = part, stop =WeldConstraint")
+ function()
+		r		weld.Part0unning = false
+ = part
+			if part and	weld.Part1 part.Parent then part = attachTo
+:Destroy() end		weld.Parent =
+	end})
+	return part
+ part
+
+		--end
+
+-- Spawn auto-remove after  selected
+btn10s
+SpawnSelected.MouseButton		delay(101Click:Connect, function()
+		(function()
+	if not	if part and part selectedId then
+.Parent then		-- if
+ nothing selected, notify details				part:Destroy()
+			endLabel
+		detailsLabel
 		end)
+	end)
+
+	--.Text = "No equip item selected to spawn toggle (client-only) on double click."
+		return
 	end
-end)
-
-titleBar.InputChanged:Connect(function(input)
-	-- no-op
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	--
+	clickArea.MouseButton2 find item
+	localClick:Connect(function()
+ chosen
+	for _,		local already = equipped it in ipairs(sampleItems)[item.id]
+		if do if it.id == already then
+			equipped[item selectedId then chosen = it break end.id] = nil end
+	if chosen
+			badge then
+		spawn.Visible = false
+			TweenService:CreateVisualForItem(chosen)
 	end
-end)
+end(card, TweenInfo)
 
--- Initial populate
-populate(sampleItems)
+-- Spawn all.new(0.14 equipped
+btnSpawn), {BackgroundColorEquipped.MouseButton3 = Color31Click:Connect(function()
+	for _, it in ipairs(sampleItems) do
+		if equipped[it.id] then
+			spawn.fromRGB(34,34,38)}):Play()
+		else
+VisualForItem(it)
+				equipped[item.id] = true
+			badge.Visible = true
+			Tween	end
+	end
+Service:Create(cardend)
 
--- Make visible with a small grow animation
-main.Size = UDim2.new(0, 520, 0, 0)
-TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 360)}):Play()
+-- Utility:, TweenInfo clear spawned visuals
+local function.new(0.14), {BackgroundColor clearSpawned()
+	for _,3 = Color3.fromRGB rec in ipairs(spawn(54,34edParts) do,48)}):
+		if recPlay()
+		end.stop then
+		
+	end)
+
+		pcall(rec.stop-- Set badge initial)
+		end
+ state
+	end
+	if equipped[item.id] then badge	spawnedParts = {}
+end
+
+-- Hotkey to.Visible = true end
+
+	return card
+end clear spawned visuals (press G)
+User
+
+-- Populate function
+InputService.InputBlocal function populate(items)
+	-- Clearegan:Connect(function(input, existing cards
+	for processed)
+ _, child in ipairs(scroll	if processed then return end:GetChildren()) do
+	
+	if input.KeyCode == Enum.KeyCode.G	if child:IsA("Frame") and child then
+		clearSpawned()
+	end
+end.Name:match("^ItemCard_") then
+			child)
+
+:Destroy()
+		end
+	end
+
+	---- Initial populate
+populate(sampleItems Determine grid columns dynamically based on width
+	local frameWidth = scroll.AbsoluteSize.X
+	local cellWidth = 150
+	local paddingX = 12)
+
+-- Make visible with small animation
+main
+	local cols = math.max(1, math.floor((frameWidth +.Size = UDim2.new(0, 760, 0 paddingX) / (cellWidth, 0)
+TweenService:Create(main + paddingX)))
+	grid.CellSize = UDim2, TweenInfo.new(0.18,.new(0, cellWidth, 0, 140)
+	grid.Cell Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {SizePadding = UDim2.new(0, paddingX = UDim2.new(0, 760, 0, 420)}):, 0, 12)
+
+	for _, item in ipairs(items) doPlay()
+
+--
+		local card = createItemCard(item)
+		card.Parent Notes:
+-- - This GUI & spawner = scroll
+	end
+
+	RunService.Heartbeat:Wait are purely client-side. They exist only on your client for testing/demos() -- allow layout to compute
+	local contentHeight = grid.AbsoluteContentSize.Y
+	scroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight and do NOT modify server-side inventories or other players')
+end
+
+-- Filter helper
+local function filterItems(query, rarity)
+	query = (query or ""):lower()
+	rarity state.
+-- - To use your own visuals: set item.image to rbxassetid://< = rarity oryour-decal-id> or replace spawnVisualForItem to "All"
+	if query == "" and rarity == "All" then
+		return sampleItems
+	end
+	local out = {}
+	for _, it in ipairs(sampleItems) do
+		local matchesQuery = clone models from ReplicatedStorage (also local-only).
+-- - Press Shift+Click on an item to toggle equip quickly. Click normally to select an item.
+-- - Press (query == "") or (string.find(it.name:lower(), query, G to clear spawned visuals.
