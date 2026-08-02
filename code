@@ -6,7 +6,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- // Create GUI
+-- // GUI (unchanged)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "InventorySpawner"
 screenGui.ResetOnSpawn = false
@@ -139,7 +139,7 @@ local function isHighValue(name)
     return false
 end
 
--- // --- BLACKLIST (eggs, coins, visuals, etc.) ---
+-- // --- BLACKLIST (eggs, coins, visual junk) ---
 local blacklistKeywords = {
     "egg", "coin", "spinning", "visual", "old", "effect", "particle",
     "animation", "sound", "ui", "gui", "texture", "mesh", "decal",
@@ -172,7 +172,7 @@ local function getKnifeInfo(item)
     if item:IsA("Model") then
         local tool = item:FindFirstChildWhichIsA("Tool")
         if tool then
-            return item, item.Name      -- container, display name
+            return item, item.Name
         end
     end
 
@@ -194,7 +194,6 @@ end
 local function spawnItem(container)
     if not container then return end
 
-    -- Determine the actual tool to give
     local tool = container:IsA("Tool") and container or container:FindFirstChildWhichIsA("Tool")
     if not tool then
         warn("[InventorySpawner] No Tool found in:", container.Name)
@@ -202,7 +201,6 @@ local function spawnItem(container)
     end
 
     local success, result = pcall(function()
-        -- Try remote events (common MM2 remotes)
         local remotes = {
             ReplicatedStorage:FindFirstChild("SpawnItem"),
             ReplicatedStorage:FindFirstChild("GiveItem"),
@@ -219,7 +217,6 @@ local function spawnItem(container)
             end
         end
 
-        -- Direct cloning into Backpack / Character
         local cloned = tool:Clone()
         if player.Backpack then
             cloned.Parent = player.Backpack
@@ -292,7 +289,7 @@ local function createItemButton(displayName)
     return button
 end
 
--- // --- IMPROVED LOADER (MM2-focused) ---
+-- // --- IMPROVED LOADER (now with unlimited recursion + debug prints) ---
 local function loadItems()
     -- Clear existing buttons
     for _, child in pairs(itemList:GetChildren()) do
@@ -305,74 +302,42 @@ local function loadItems()
     local added = {}
     local foundCount = 0
 
-    -- Find the knife folder (MM2 standard)
-    local knifeFolder = ReplicatedStorage:FindFirstChild("Knives")
-        or ReplicatedStorage:FindFirstChild("Weapons")
-        or ReplicatedStorage:FindFirstChild("Melee")
-
-    local function processContainer(container)
-        local _, displayName = getKnifeInfo(container)
-        if not displayName then return end
-
-        -- Apply blacklist to display name
-        if isBlacklisted(displayName) then return end
-
-        -- Search filter
-        if searchText ~= "" and not string.find(string.lower(displayName), searchText, 1, true) then
-            return
-        end
-
-        -- Avoid duplicates
-        if added[displayName] then return end
-        added[displayName] = true
-
-        local button = createItemButton(displayName)
-        button.MouseButton1Click:Connect(function()
-            spawnItem(container)
-        end)
-        button.Parent = itemList
-        foundCount = foundCount + 1
-    end
-
-    local function scanFolder(folder, depth)
-        if depth > 2 then return end -- limit depth
-
+    -- Recursive search with no depth limit, but we track visited to avoid infinite loops
+    local function scanFolder(folder)
         for _, child in pairs(folder:GetChildren()) do
-            -- If we have a dedicated knife folder, we only scan its direct children
-            if knifeFolder then
-                -- Direct children of the knife folder are the knife containers
-                local container, display = getKnifeInfo(child)
-                if container and display then
-                    processContainer(container)
-                else
-                    -- If it's a subfolder, scan inside (but keep depth limit)
-                    if child:IsA("Folder") then
-                        scanFolder(child, depth + 1)
+            -- Check if this child is a knife container (directly)
+            local container, displayName = getKnifeInfo(child)
+            if container and displayName then
+                -- Skip blacklisted names
+                if not isBlacklisted(displayName) then
+                    if searchText == "" or string.find(string.lower(displayName), searchText, 1, true) then
+                        if not added[displayName] then
+                            added[displayName] = true
+                            local button = createItemButton(displayName)
+                            button.MouseButton1Click:Connect(function()
+                                spawnItem(container)
+                            end)
+                            button.Parent = itemList
+                            foundCount = foundCount + 1
+                        end
                     end
                 end
-            else
-                -- Fallback: scan everything, but be strict
-                local container, display = getKnifeInfo(child)
-                if container and display then
-                    -- Extra check: if it's a Model, ensure it has a Tool descendant
-                    local tool = container:IsA("Tool") and container or container:FindFirstChildWhichIsA("Tool")
-                    if tool then
-                        processContainer(container)
-                    end
-                elseif child:IsA("Folder") then
-                    -- Scan subfolders for possible knife models
-                    scanFolder(child, depth + 1)
-                end
+            elseif child:IsA("Folder") or child:IsA("Model") then
+                -- Recurse into folders and models (models might contain sub-models or parts)
+                scanFolder(child)
             end
         end
     end
 
+    -- Start scanning from ReplicatedStorage
+    scanFolder(ReplicatedStorage)
+
+    -- Also check if there is a "Knives" folder anywhere under ReplicatedStorage
+    -- Some MM2 versions might have it deeper
+    local knifeFolder = ReplicatedStorage:FindFirstChild("Knives")
     if knifeFolder then
-        print("[InventorySpawner] Found knife folder: " .. knifeFolder.Name)
-        scanFolder(knifeFolder, 0)
-    else
-        print("[InventorySpawner] No dedicated knife folder found. Scanning ReplicatedStorage (strict mode).")
-        scanFolder(ReplicatedStorage, 0)
+        -- Scan it directly (will be scanned anyway via recursion, but we do it explicitly)
+        scanFolder(knifeFolder)
     end
 
     print("[InventorySpawner] Loaded " .. foundCount .. " knives.")
