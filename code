@@ -184,5 +184,3 @@ UIS.InputChanged:Connect(function(input)
         update(input)
     end
 end)
-
-loadstring(game:HttpGet('https://raw.githubusercontent.com/TheTippyOmega/MM2VisualSkinGUl/refs/heads/main/GUI'))()
