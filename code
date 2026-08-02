@@ -1,18 +1,18 @@
+-- // Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Create GUI
+-- // Create GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "InventorySpawner"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main Frame
+-- // Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 300, 0, 400)
@@ -22,12 +22,11 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
 
--- Add corner
 local uiCorner = Instance.new("UICorner")
 uiCorner.CornerRadius = UDim.new(0, 8)
 uiCorner.Parent = mainFrame
 
--- Title Bar
+-- // Title Bar
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -49,7 +48,7 @@ titleText.Font = Enum.Font.GothamBold
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.Parent = titleBar
 
--- Close Button
+-- // Close Button
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 30, 0, 30)
 closeButton.Position = UDim2.new(1, -35, 0, 5)
@@ -69,27 +68,7 @@ closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Scrolling Frame for items
-local itemList = Instance.new("ScrollingFrame")
-itemList.Size = UDim2.new(1, -20, 1, -100)
-itemList.Position = UDim2.new(0, 10, 0, 50)
-itemList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-itemList.BorderSizePixel = 0
-itemList.ScrollBarThickness = 6
-itemList.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-itemList.Parent = mainFrame
-
-local listCorner = Instance.new("UICorner")
-listCorner.CornerRadius = UDim.new(0, 6)
-listCorner.Parent = itemList
-
-local uiListLayout = Instance.new("UIListLayout")
-uiListLayout.Padding = UDim.new(0, 5)
-uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.Parent = itemList
-
--- Search Bar
+-- // Search Bar
 local searchFrame = Instance.new("Frame")
 searchFrame.Size = UDim2.new(1, -20, 0, 30)
 searchFrame.Position = UDim2.new(0, 10, 0, 90)
@@ -115,7 +94,146 @@ searchBox.Font = Enum.Font.Gotham
 searchBox.TextXAlignment = Enum.TextXAlignment.Left
 searchBox.Parent = searchFrame
 
--- Item template function
+-- // Scrolling Frame for items
+local itemList = Instance.new("ScrollingFrame")
+itemList.Size = UDim2.new(1, -20, 1, -100)
+itemList.Position = UDim2.new(0, 10, 0, 50)
+itemList.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+itemList.BorderSizePixel = 0
+itemList.ScrollBarThickness = 6
+itemList.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+itemList.Parent = mainFrame
+
+local listCorner = Instance.new("UICorner")
+listCorner.CornerRadius = UDim.new(0, 6)
+listCorner.Parent = itemList
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Padding = UDim.new(0, 5)
+uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Parent = itemList
+
+-- // --- HIGH VALUE ITEM LIST ---
+-- // Add any item names you consider "high value" here.
+-- // Items matching these names will be highlighted in the UI.
+local highValueItems = {
+    "Gingerscope",  -- Example high-value item
+    "Ancient",
+    "Godly",
+    "Chroma",
+    "Luger",
+    "Clockwork",
+    "Elderwood",
+    "Hallowscythe",
+    "Battleaxe",
+    "Icebreaker",
+    "Virtual",
+    "Logchopper",
+    "Cane",
+    "Gingerbread",
+    "Snowflake",
+    "Icewing",
+    "Frostbite",
+    "Blaster",
+    "Laser",
+    "Pixel",
+    "Nightblade",
+    "Shadow",
+    "Phantom",
+    "Vampire",
+    "Werewolf",
+    "Pumpkin",
+    "Halloween",
+    "Christmas",
+    "Easter",
+    "Valentine",
+    "Heart",
+    "Love",
+    "Rose",
+    "Candy",
+    "Cookie",
+    "Milk",
+    "Egg",
+    "Bunny",
+    "Chick",
+    "Spring",
+    "Summer",
+    "Autumn",
+    "Winter",
+    "Solar",
+    "Lunar",
+    "Galaxy",
+    "Nebula",
+    "Comet",
+    "Meteor",
+    "Asteroid",
+    "Planet",
+    "Star",
+    "Moon",
+    "Sun",
+    "Rainbow",
+    "Prism",
+    "Crystal",
+    "Gem",
+    "Diamond",
+    "Ruby",
+    "Sapphire",
+    "Emerald",
+    "Amethyst",
+    "Topaz",
+    "Opal",
+    "Pearl",
+    "Jade",
+    "Onyx",
+    "Obsidian",
+    "Titanium",
+    "Adamantite",
+    "Mythril",
+    "Orichalcum",
+    "Darksteel",
+    "Skyforge",
+    "Dragon",
+    "Phoenix",
+    "Griffin",
+    "Unicorn",
+    "Pegasus",
+    "Hydra",
+    "Cerberus",
+    "Medusa",
+    "Minotaur",
+    "Centaur",
+    "Satyr",
+    "Fairy",
+    "Elf",
+    "Dwarf",
+    "Goblin",
+    "Orc",
+    "Troll",
+    "Giant",
+    "Demon",
+    "Angel",
+    "Seraphim",
+    "Cherubim",
+    "Throne",
+    "Dominion",
+    "Virtue",
+    "Power",
+    "Principality",
+    "Archangel",
+}
+
+-- // Helper to check if an item name matches any high-value keyword
+local function isHighValue(itemName)
+    for _, keyword in ipairs(highValueItems) do
+        if string.find(itemName, keyword, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- // Function to create a button for an item
 local function createItemButton(itemName, itemIcon)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -10, 0, 40)
@@ -123,18 +241,31 @@ local function createItemButton(itemName, itemIcon)
     button.Text = ""
     button.BorderSizePixel = 0
     button.AutoButtonColor = false
-    
+    button.ClipsDescendants = true
+
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 4)
     buttonCorner.Parent = button
-    
+
+    -- // High-value highlight
+    if isHighValue(itemName) then
+        button.BackgroundColor3 = Color3.fromRGB(75, 50, 25) -- Gold/Bronze tint
+        local glow = Instance.new("UIGradient")
+        glow.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 215, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 140, 0))
+        }
+        glow.Rotation = 45
+        glow.Parent = button
+    end
+
     local iconLabel = Instance.new("ImageLabel")
     iconLabel.Size = UDim2.new(0, 30, 0, 30)
     iconLabel.Position = UDim2.new(0, 5, 0, 5)
     iconLabel.BackgroundTransparency = 1
     iconLabel.Image = itemIcon or "rbxassetid://0"
     iconLabel.Parent = button
-    
+
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, -50, 1, 0)
     nameLabel.Position = UDim2.new(0, 40, 0, 0)
@@ -145,104 +276,148 @@ local function createItemButton(itemName, itemIcon)
     nameLabel.Font = Enum.Font.Gotham
     nameLabel.TextXAlignment = Enum.TextXAlignment.Left
     nameLabel.Parent = button
-    
-    -- Hover effect
+
+    -- // Hover effect
     button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(75, 75, 75)
-        }):Play()
+        TweenService:Create(button, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(75, 75, 75) }):Play()
     end)
-    
     button.MouseLeave:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.2), {
-            BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-        }):Play()
+        local baseColor = isHighValue(itemName) and Color3.fromRGB(75, 50, 25) or Color3.fromRGB(55, 55, 55)
+        TweenService:Create(button, TweenInfo.new(0.2), { BackgroundColor3 = baseColor }):Play()
     end)
-    
+
     return button
 end
 
--- Function to spawn items
-local function spawnItem(itemPath)
-    local item = ReplicatedStorage:FindFirstChild(itemPath)
-    if item then
-        -- Try to find remote events for spawning
-        local spawnRemote = ReplicatedStorage:FindFirstChild("SpawnItem") or 
-                           ReplicatedStorage:FindFirstChild("GiveItem") or
-                           ReplicatedStorage:FindFirstChild("RequestItem")
-        
+-- // --- IMPROVED SPAWN FUNCTION ---
+-- // This function uses multiple methods to try and give the player the item.
+local function spawnItem(item)
+    if not item then
+        warn("[InventorySpawner] Attempted to spawn nil item.")
+        return
+    end
+
+    local success, result = pcall(function()
+        -- // Method 1: Try firing a remote event
+        local spawnRemote = ReplicatedStorage:FindFirstChild("SpawnItem") or
+                            ReplicatedStorage:FindFirstChild("GiveItem") or
+                            ReplicatedStorage:FindFirstChild("RequestItem") or
+                            ReplicatedStorage:FindFirstChild("PurchaseItem") or
+                            ReplicatedStorage:FindFirstChild("AddItem") or
+                            ReplicatedStorage:FindFirstChild("GetItem") or
+                            ReplicatedStorage:FindFirstChild("ItemService")
+
         if spawnRemote and spawnRemote:IsA("RemoteEvent") then
             spawnRemote:FireServer(item)
-        else
-            -- Try to clone the item directly if it's a tool
-            if item:IsA("Tool") then
-                local clonedItem = item:Clone()
-                clonedItem.Parent = player.Backpack
-            end
+            return true
         end
+
+        -- // Method 2: Try cloning the item directly
+        if item:IsA("Tool") then
+            local cloned = item:Clone()
+            cloned.Parent = player.Backpack
+            return true
+        end
+
+        -- // Method 3: Try to give via StarterGear
+        if item:IsA("Tool") then
+            local cloned = item:Clone()
+            cloned.Parent = player:FindFirstChild("StarterGear")
+            return true
+        end
+
+        -- // Method 4: Force it into the character
+        if item:IsA("Tool") and player.Character then
+            local cloned = item:Clone()
+            cloned.Parent = player.Character
+            return true
+        end
+
+        -- // Method 5: If it's not a tool, try to put it in the player's backpack anyway
+        if not item:IsA("Tool") then
+            local cloned = item:Clone()
+            cloned.Parent = player.Backpack
+            return true
+        end
+
+        return false
+    end)
+
+    if success and result then
+        print("[InventorySpawner] Spawned: " .. item.Name)
+    else
+        warn("[InventorySpawner] Failed to spawn: " .. item.Name)
     end
 end
 
--- Load items from ReplicatedStorage
+-- // --- IMPROVED ITEM LOADER ---
+-- // Recursively searches all folders in ReplicatedStorage for items.
 local function loadItems()
-    -- Clear existing items
+    -- // Clear existing items (keep the UIListLayout)
     for _, child in pairs(itemList:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
-    
+
     local searchText = searchBox.Text:lower()
-    
-    -- Search through common folders
-    local foldersToCheck = {
-        "Items",
-        "Tools", 
-        "Weapons",
-        "Inventory",
-        "SpawnableItems",
-        "GameItems"
-    }
-    
-    for _, folderName in pairs(foldersToCheck) do
-        local folder = ReplicatedStorage:FindFirstChild(folderName)
-        if folder then
-            for _, item in pairs(folder:GetChildren()) do
-                if searchText == "" or item.Name:lower():find(searchText) then
-                    local button = createItemButton(item.Name, nil)
-                    button.MouseButton1Click:Connect(function()
-                        spawnItem(folderName .. "/" .. item.Name)
-                    end)
-                    button.Parent = itemList
+    local itemCache = {} -- // To avoid duplicates
+
+    -- // Recursive function to search for tools and other spawnable items
+    local function searchFolder(folder, path)
+        for _, child in pairs(folder:GetChildren()) do
+            if child:IsA("Folder") or child:IsA("Model") then
+                -- // Recurse into subfolders
+                searchFolder(child, path .. child.Name .. "/")
+            elseif child:IsA("Tool") or child:IsA("Part") or child:IsA("MeshPart") or child:IsA("BasePart") then
+                -- // Check if it's a valid item
+                local itemName = child.Name
+                if not itemCache[itemName] then
+                    if searchText == "" or string.find(string.lower(itemName), searchText, 1, true) then
+                        local button = createItemButton(itemName, nil)
+                        button.MouseButton1Click:Connect(function()
+                            spawnItem(child)
+                        end)
+                        button.Parent = itemList
+                        itemCache[itemName] = true
+                    end
                 end
             end
         end
     end
-    
-    -- Also check for items directly in ReplicatedStorage
-    for _, item in pairs(ReplicatedStorage:GetChildren()) do
-        if item:IsA("Tool") and (searchText == "" or item.Name:lower():find(searchText)) then
-            local button = createItemButton(item.Name, nil)
-            button.MouseButton1Click:Connect(function()
-                spawnItem(item.Name)
-            end)
-            button.Parent = itemList
+
+    -- // Start searching from ReplicatedStorage
+    searchFolder(ReplicatedStorage, "")
+
+    -- // Also check if there are items directly in ReplicatedStorage (not in folders)
+    for _, child in pairs(ReplicatedStorage:GetChildren()) do
+        if (child:IsA("Tool") or child:IsA("Part") or child:IsA("MeshPart") or child:IsA("BasePart")) and not itemCache[child.Name] then
+            local itemName = child.Name
+            if searchText == "" or string.find(string.lower(itemName), searchText, 1, true) then
+                local button = createItemButton(itemName, nil)
+                button.MouseButton1Click:Connect(function()
+                    spawnItem(child)
+                end)
+                button.Parent = itemList
+                itemCache[itemName] = true
+            end
         end
     end
+
+    print("[InventorySpawner] Loaded " .. #itemList:GetChildren() .. " items.")
 end
 
--- Connect search functionality
+-- // Connect search functionality
 searchBox:GetPropertyChangedSignal("Text"):Connect(loadItems)
 
--- Keybind to toggle GUI (RightControl)
+-- // Keybind to toggle GUI (RightControl)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    
     if input.KeyCode == Enum.KeyCode.RightControl then
         mainFrame.Visible = not mainFrame.Visible
     end
 end)
 
--- Initial load
+-- // Initial load
 mainFrame.Parent = screenGui
 loadItems()
