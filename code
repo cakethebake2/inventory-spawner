@@ -1,155 +1,30 @@
--- Debug / fail-safe mock inventory GUI
--- Place this as a LocalScript in StarterPlayerScripts (or StarterGui).
-local success, err = pcall(function()
+-- Minimal client-run test LocalScript
+print("[InvTest] script loaded")
 
-	local Players = game:GetService("Players")
-	local TweenService = game:GetService("TweenService")
-	local player = Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-	print("[MockInventoryGUI] script started")
+if not player then
+    warn("[InvTest] No LocalPlayer found — script may be running on the server. Make sure this is a LocalScript and you're running Play/Start.")
+    return
+end
 
-	-- Remove any old debug GUI
-	local GUI_NAME = "MockInventoryGUI_debug"
-	local existing = playerGui:FindFirstChild(GUI_NAME)
-	if existing then existing:Destroy() end
+print("[InvTest] LocalPlayer:", player.Name)
 
-	-- Create ScreenGui
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = GUI_NAME
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
+-- Show a tiny UI to confirm visuals
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InvTestGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Simple toggle button (always visible)
-	local toggle = Instance.new("TextButton")
-	toggle.Name = "ToggleBtn"
-	toggle.Size = UDim2.new(0, 80, 0, 28)
-	toggle.Position = UDim2.new(0, 8, 0, 8)
-	toggle.AnchorPoint = Vector2.new(0,0)
-	toggle.BackgroundColor3 = Color3.fromRGB(55,80,150)
-	toggle.TextColor3 = Color3.fromRGB(255,255,255)
-	toggle.Text = "Open Inv"
-	toggle.Font = Enum.Font.SourceSansBold
-	toggle.TextSize = 16
-	toggle.Parent = screenGui
-	local tCorner = Instance.new("UICorner", toggle)
-	tCorner.CornerRadius = UDim.new(0,6)
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0,200,0,40)
+label.Position = UDim2.new(0,8,0,8)
+label.BackgroundColor3 = Color3.fromRGB(50,120,200)
+label.TextColor3 = Color3.fromRGB(255,255,255)
+label.Text = "InvTest GUI visible"
+label.Font = Enum.Font.SourceSansBold
+label.TextSize = 18
+label.Parent = screenGui
 
-	-- Main frame (visible by default = false)
-	local main = Instance.new("Frame")
-	main.Name = "Main"
-	main.Size = UDim2.new(0, 600, 0, 360)
-	main.Position = UDim2.new(0.5, -300, 0.5, -180)
-	main.AnchorPoint = Vector2.new(0.5,0.5)
-	main.BackgroundColor3 = Color3.fromRGB(30,30,35)
-	main.BorderSizePixel = 0
-	main.Visible = false
-	main.Parent = screenGui
-	local mainCorner = Instance.new("UICorner", main)
-	mainCorner.CornerRadius = UDim.new(0,10)
-
-	-- Title bar and close
-	local title = Instance.new("TextLabel", main)
-	title.Size = UDim2.new(1, -16, 0, 36)
-	title.Position = UDim2.new(0,8,0,8)
-	title.BackgroundTransparency = 1
-	title.Text = "Mock Inventory (debug)"
-	title.Font = Enum.Font.SourceSansBold
-	title.TextSize = 20
-	title.TextColor3 = Color3.fromRGB(240,240,240)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-
-	local close = Instance.new("TextButton", main)
-	close.Size = UDim2.new(0,70,0,28)
-	close.Position = UDim2.new(1, -78, 0, 10)
-	close.BackgroundColor3 = Color3.fromRGB(180,60,60)
-	close.Text = "Close"
-	close.Font = Enum.Font.SourceSans
-	close.TextSize = 14
-	close.TextColor3 = Color3.fromRGB(255,255,255)
-	close.BorderSizePixel = 0
-	local closeCorner = Instance.new("UICorner", close); closeCorner.CornerRadius = UDim.new(0,6)
-
-	-- Basic content so we can confirm visuals
-	local info = Instance.new("TextLabel", main)
-	info.Size = UDim2.new(1, -16, 0, 120)
-	info.Position = UDim2.new(0,8,0,56)
-	info.BackgroundColor3 = Color3.fromRGB(40,40,45)
-	info.Text = "If you see this, the GUI is running.\n\nControls:\n- Click items (mock)\n- 'Spawn' will create a local part in workspace\n- Press G to clear spawned visuals\n\nCheck the Output window for debug prints."
-	info.TextWrapped = true
-	info.Font = Enum.Font.SourceSans
-	info.TextSize = 16
-	info.TextColor3 = Color3.fromRGB(230,230,230)
-	local infoCorner = Instance.new("UICorner", info); infoCorner.CornerRadius = UDim.new(0,6)
-
-	-- Simple example button (Spawn)
-	local spawnBtn = Instance.new("TextButton", main)
-	spawnBtn.Size = UDim2.new(0,120,0,34)
-	spawnBtn.Position = UDim2.new(0,8,1,-46)
-	spawnBtn.BackgroundColor3 = Color3.fromRGB(80,160,80)
-	spawnBtn.Text = "Spawn Example"
-	spawnBtn.Font = Enum.Font.SourceSans
-	spawnBtn.TextSize = 16
-	spawnBtn.TextColor3 = Color3.fromRGB(255,255,255)
-	local spawnCorner = Instance.new("UICorner", spawnBtn); spawnCorner.CornerRadius = UDim.new(0,6)
-
-	-- Debug label for errors/status
-	local status = Instance.new("TextLabel", main)
-	status.Size = UDim2.new(1, -140, 0, 34)
-	status.Position = UDim2.new(0,128,1,-46)
-	status.BackgroundTransparency = 1
-	status.Text = "Status: Ready"
-	status.Font = Enum.Font.SourceSans
-	status.TextSize = 16
-	status.TextColor3 = Color3.fromRGB(220,220,220)
-	status.TextXAlignment = Enum.TextXAlignment.Left
-
-	-- Toggle behavior
-	local function setOpen(val)
-		main.Visible = val
-		toggle.Text = val and "Close Inv" or "Open Inv"
-	end
-
-	toggle.MouseButton1Click:Connect(function()
-		setOpen(not main.Visible)
-		print("[MockInventoryGUI] toggle clicked, open = ", main.Visible)
-	end)
-
-	close.MouseButton1Click:Connect(function()
-		setOpen(false)
-	end)
-
-	-- Spawn example action (client-only, non-exploit)
-	local spawned = {}
-	spawnBtn.MouseButton1Click:Connect(function()
-		local part = Instance.new("Part")
-		part.Size = Vector3.new(0.6,0.2,0.6)
-		part.Anchored = true
-		part.CanCollide = false
-		part.Position = workspace.CurrentCamera.CFrame.Position + workspace.CurrentCamera.CFrame.LookVector * 3 + Vector3.new(0, -0.5, 0)
-		part.Color = Color3.fromRGB(200,180,60)
-		part.Parent = workspace
-		table.insert(spawned, part)
-		status.Text = "Status: Spawned visual part (client-only). Count = ".. tostring(#spawned)
-		print("[MockInventoryGUI] spawned client part, total:", #spawned)
-	end)
-
-	-- Clear on G
-	local UserInputService = game:GetService("UserInputService")
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then return end
-		if input.KeyCode == Enum.KeyCode.G then
-			for _, p in ipairs(spawned) do
-				if p and p.Parent then p:Destroy() end
-			end
-			spawned = {}
-			status.Text = "Status: Cleared spawned visuals"
-			print("[MockInventoryGUI] cleared spawned visuals")
-		end
-		if input.KeyCode == Enum.KeyCode.I then
-			setOpen(not main.Visible)
-			print("[MockInventoryGUI] I key pressed toggle, open = ", main.Visible)
-		end
-	end)
-
-	print("[MockInventoryGUI] GUI created successfully; toggle in top-left. Press I to open/close. Press G to clear sp_*
+print("[InvTest] GUI created; look top-left of screen for 'InvTest GUI visible'")
